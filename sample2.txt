@@ -1,0 +1,119 @@
+const express = require('express')
+const app = express()
+const cors = require('cors')
+require('dotenv').config()
+const bodyParser=require("body-parser");
+const mongoose=require("mongoose");
+const Schema=mongoose.Schema;
+
+mongoose.connect(process.env.DB_URL);
+app.use(express.urlencoded({extended:true}));
+
+const userSchema=new Schema({
+  username:{
+    type:String,
+    required:true,
+  },
+})
+let user=mongoose.model("user",userSchema);
+const exerciseSchema=new Schema({
+  userId:{
+    type:String,
+    required:true,
+  },
+  description:{
+    type:String,
+    required:true,
+  },
+  duration:{
+    type:Number,
+    required:true,
+  },
+  date:{
+    type:Date,
+    default:new Date(),
+  }
+})
+const exercise=mongoose.model("exercise",exerciseSchema);
+app.use(cors())
+app.use(express.static('public'))
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/views/index.html')
+});
+
+app.post("/api/users",(req,res)=>{
+  console.log(req.body);
+  let username=req.body.username;
+  let newUser=user({username:username});
+  newUser.save();
+  res.json(newUser);
+
+})
+
+app.get("/api/users",(req,res)=>{
+  user.find({}).then((users)=>{
+    res.json(users);
+  })
+});
+
+app.post("/api/users/:_id/exercises",(req,res)=>{
+  console.log(req.body);
+  let userId=req.params._id;
+
+  let exerciseObj={
+    userId:userId,
+    description:req.body.description,
+    duration:req.body.duration,
+  }
+  if(req.body.date!=""){
+    exerciseObj.date=req.body.date;
+  }
+  let newExercise=new exercise(exerciseObj);
+  let userfound=user.findById(userId);
+  newExercise.save();
+  res.json({
+    _id:userfound._id,
+    username:userfound.username,
+    description:newExercise.description,
+    duration:newExercise.duration,
+   date:newExercise.date.toDateString()
+  })
+
+})
+
+app.get("/api/users/:_id/logs",(req,res)=>{
+  let id=req.params._id;
+
+  let responseObj={};
+  let userfound=user.findById(id);
+
+  let username=userfound.username;
+  let userId=userfound._id;
+
+  responseObj={
+    _id:userId,
+    username:username,
+  }
+  exercise.find({userId:userId}).then((err,exercises)=>{
+    if(err){
+      console.log(err);
+    }
+    exercises?.map((x)=>{
+      return{
+        description:x.description,
+        duration:x.duration,
+        date:x.date.toDateString()
+
+      }
+    })
+    responseObj.log=exercises;
+    responseObj.count=exercises?.length;
+    res.json(responseObj);
+
+  })  
+})
+  
+
+const listener = app.listen(process.env.PORT || 3000, () => {
+  console.log('Your app is listening on port ' + listener.address().port)
+})
